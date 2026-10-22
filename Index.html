@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kerala Lottery Number Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f0;--panel:#fff;--ink:#17261f;--mute:#5b6b63;--line:#cfdad4;--acc:#0f7a5c;--accink:#fff;--tk:#f6d6df;--tkink:#2a1220;--warn:#8a3b12;
+color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1f1a;--panel:#16302a;--ink:#e6f1ec;--mute:#93aaa0;--line:#2b4a41;--acc:#3fc79b;--accink:#06231a;--tk:#f1c9d4;--tkink:#2a1220;--warn:#f0b48a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1f1a;--panel:#16302a;--ink:#e6f1ec;--mute:#93aaa0;--line:#2b4a41;--acc:#3fc79b;--accink:#06231a;--tk:#f1c9d4;--tkink:#2a1220;--warn:#f0b48a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Bricolage Grotesque",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:clamp(26px,5vw,38px);margin:0 0 6px;font-weight:800;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 20px;max-width:60ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label{display:block;font-size:14px;color:var(--mute);margin-bottom:4px}
+select,input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+textarea{min-height:90px;resize:vertical}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:11px 18px;cursor:pointer;background:var(--acc);color:var(--accink)}
+button.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.tickets{display:grid;gap:10px;margin-top:4px}
+.ticket{background:var(--tk);color:var(--tkink);border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-left:10px dotted rgba(42,18,32,.35)}
+.ticket b{font-size:clamp(24px,6vw,34px);font-variant-numeric:tabular-nums;letter-spacing:.06em;font-weight:800}
+.ticket span{font-size:13px;opacity:.75}
+.note{font-size:14px;color:var(--warn);margin:10px 0 0}
+.stats{font-size:14px;color:var(--mute);margin-top:10px;overflow-x:auto}
+.stats table{border-collapse:collapse;min-width:480px}
+.stats td,.stats th{padding:3px 8px;text-align:center;border-bottom:1px solid var(--line)}
+.empty{color:var(--mute);padding:8px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Kerala lottery number generator</h1>
+<p class="sub">Makes valid ticket numbers (series + 6 digits). Every draw is independent, so no method improves your odds. Treat this as entertainment.</p>
+
+<section class="panel">
+<div class="row">
+<div><label for="scheme">Scheme</label>
+<select id="scheme"></select></div>
+<div><label for="series">Series codes (comma separated)</label>
+<input id="series"></div>
+<div><label for="count">How many tickets</label>
+<input id="count" type="number" min="1" max="50" value="5"></div>
+<div><label for="mode">Method</label>
+<select id="mode"><option value="uniform">Uniform random (fair baseline)</option><option value="weighted">Weighted by pasted history</option></select></div>
+</div>
+<div id="histBox" hidden style="margin-top:12px">
+<label for="hist">Past winning numbers, one per line (6 digits, optional series before it)</label>
+<textarea id="hist" placeholder="WD 123456&#10;654321"></textarea>
+<div class="stats" id="stats"></div>
+</div>
+<p class="note">Series codes and prices change by draw. Check the code on the official notice at statelottery.kerala.gov.in and edit the field above.</p>
+<div class="actions"><button id="go">Generate tickets</button><button class="alt" id="copy">Copy all</button></div>
+</section>
+
+<section class="panel"><div class="tickets" id="out"><div class="empty">Press Generate tickets to see numbers here.</div></div></section>
+</main>
+<script>
+var SCHEMES={"Win-Win (Monday)":"W","Sthree Sakthi (Tuesday)":"SS","Akshaya (Wednesday)":"AK","Karunya Plus (Thursday)":"KN","Nirmal (Friday)":"NR","Karunya (Saturday)":"KR","Pournami (Sunday)":"RN"};
+var $=function(i){return document.getElementById(i)};
+var sel=$("scheme");
+Object.keys(SCHEMES).forEach(function(k){var o=document.createElement("option");o.textContent=k;sel.appendChild(o)});
+function syncSeries(){$("series").value=SCHEMES[sel.value]}
+sel.onchange=syncSeries;syncSeries();
+$("mode").onchange=function(){$("histBox").hidden=this.value!=="weighted";analyse()};
+
+function rnd(n){var a=new Uint32Array(1),lim=Math.floor(4294967296/n)*n,x;do{crypto.getRandomValues(a);x=a[0]}while(x>=lim);return x%n}
+function parseHist(){return $("hist").value.split(/\n/).map(function(l){var m=l.replace(/\D/g,"");return m.length>=6?m.slice(-6):null}).filter(Boolean)}
+function digitCounts(h){var c=[];for(var p=0;p<6;p++){c.push(new Array(10).fill(0))}h.forEach(function(n){for(var p=0;p<6;p++)c[p][+n[p]]++});return c}
+function pick(weights){var t=weights.reduce(function(a,b){return a+b},0),r=rnd(Math.floor(t*1000))/1000,s=0;for(var i=0;i<weights.length;i++){s+=weights[i];if(r<s)return i}return weights.length-1}
+function analyse(){
+  var box=$("stats");box.innerHTML="";
+  if($("mode").value!=="weighted")return;
+  var h=parseHist();if(h.length<10){box.textContent="Paste at least 10 past numbers to see digit statistics.";return}
+  var c=digitCounts(h),exp=h.length/10,rows="<table><tr><th>Position</th>";
+  for(var d=0;d<10;d++)rows+="<th>"+d+"</th>";
+  rows+="<th>Chi-square</th></tr>";
+  for(var p=0;p<6;p++){var chi=c[p].reduce(function(a,o){return a+(o-exp)*(o-exp)/exp},0);
+    rows+="<tr><td>"+(p+1)+"</td>"+c[p].map(function(o){return"<td>"+o+"</td>"}).join("")+"<td>"+chi.toFixed(1)+(chi<16.92?" (random-like)":" (check)")+"</td></tr>"}
+  box.innerHTML=rows+"</table><div>Chi-square below 16.92 means the digit spread is consistent with a fair draw at the 5% level (9 degrees of freedom).</div>";
+}
+$("hist").oninput=analyse;
+
+var last=[];
+$("go").onclick=function(){
+  var codes=$("series").value.split(",").map(function(s){return s.trim().toUpperCase()}).filter(Boolean);
+  if(!codes.length){$("out").innerHTML='<div class="empty">Add at least one series code.</div>';return}
+  var n=Math.max(1,Math.min(50,parseInt($("count").value,10)||1));
+  var weighted=$("mode").value==="weighted",h=weighted?parseHist():[],c=h.length>=10?digitCounts(h):null;
+  var seen={},res=[],tries=0;
+  while(res.length<n&&tries<n*50){tries++;
+    var s=codes[rnd(codes.length)],num="";
+    for(var p=0;p<6;p++){num+=c?pick(c[p].map(function(x){return x+1})):rnd(10)}
+    var t=s+" "+num;if(!seen[t]){seen[t]=1;res.push(t)}}
+  last=res;
+  var note=weighted&&!c?'<div class="empty">Not enough history yet, so these use the uniform method.</div>':"";
+  $("out").innerHTML=note+res.map(function(t){var p=t.split(" ");return'<div class="ticket"><b>'+p[0]+" "+p[1]+"</b><span>"+(weighted&&c?"weighted":"uniform")+"</span></div>"}).join("");
+};
+$("copy").onclick=function(){
+  if(!last.length)return;var b=this,txt=last.join("\n");
+  try{navigator.clipboard.writeText(txt).then(function(){b.textContent="Copied"},function(){b.textContent="Copy blocked"})}catch(e){b.textContent="Copy blocked"}
+  setTimeout(function(){b.textContent="Copy all"},1500);
+};
+</script>
+</body>
+</html>
